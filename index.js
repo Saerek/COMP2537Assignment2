@@ -193,8 +193,11 @@ app.post('/submitUser', async (req,res) => {
 
 	await userCollection.insertOne({username: username, email: email, password: hashedPassword});
 	console.log("created user");
-
-    alert("Successfully Created User");
+    const result = await userCollection.find({email: email}).project({username: 1, email: 1, password: 1, _id: 1}).toArray();
+    req.session.authenticated = true;
+    req.session.user = result[0].username;
+	req.session.email = email;
+	req.session.cookie.maxAge = expireTime;
     res.redirect("/members");
     res.send(html);
 });
@@ -260,7 +263,6 @@ app.get('/loggedin', (req,res) => {
     if (!req.session.authenticated) {
         res.redirect('/login');
     }
-    alert("Successfully Logged In");
     res.redirect('/members');
     res.send(html);
 });
