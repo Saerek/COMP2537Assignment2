@@ -109,7 +109,7 @@ app.get('/members', (req,res) => {
         case 1:
           res.send(`    
           <h1>Hello, ${username}</h1>
-          <img src='/blade.gif' style='width:500px';/>  
+          <img src='/Blade.gif' style='width:500px';/>  
           <form action='/logout' method='GET'>
             <button>Sign Out</button>
           </form>`);
