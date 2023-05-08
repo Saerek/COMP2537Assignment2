@@ -29,10 +29,12 @@ const userCollection = database.db(mongodb_database).collection('users');
 
 app.use(express.urlencoded({extended: false}));
 
+app.set('view engine', 'ejs');
+
 var mongoStore = MongoStore.create({
-	mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/sessions`,
+    mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/sessions`,
 	crypto: {
-		secret: mongodb_session_secret
+        secret: mongodb_session_secret
 	}
 })
 
@@ -44,33 +46,50 @@ app.use(session({
 }
 ));
 
-app.get('/', (req,res) => {
-    var html = `
-    <form action='/signup' method='get'>
-    <button>Sign Up</button>
-    </form>
-    <form action='/login' method='get'>
-    <button>Login</button>
-    </form>
-    `;
+function isValidSession(req) {
     if (req.session.authenticated) {
-        var user = req.session.user;
-        var html = `
-        <h3>Hello, ${user}</h3>
-        <form action='/members' method='get'>
-        <button>Members</button>
-        </form>
-        <form action='/logout' method='get'>
-        <button>Log Out</button>
-        </form>
-        `;
+        return true;
     }
-    res.send(html);
+    return false;
+}
+
+function sessionValidation(req,res,next) {
+    if (isValidSession(req)) {
+        next();
+    }
+    else {
+        res.redirect('/login');
+    }
+}
+
+function isAdmin(req) {
+    if (req.session.user_type == 'admin') {
+        return true;
+    }
+    return false;
+}
+
+function adminAuthorization(req, res, next) {
+    if (!isAdmin(req)) {
+        res.status(403);
+        res.render("errorMessage", {error: "Not Authorized"});
+        return;
+    }
+    else {
+        next();
+    }
+}
+
+app.get('/', (req,res) => {
+    res.render("homepage", {
+        user: req.session.user,
+        authenticated: req.session.authenticated
+    });
 });
 
 app.get('/nosql-injection', async (req,res) => {
-	var username = req.query.user;
-
+    var username = req.query.user;
+    
 	if (!username) {
 		res.send(`<h3>no user provided - try /nosql-injection?user=name</h3> <h3>or /nosql-injection?user[$ne]=name</h3>`);
 		return;
@@ -99,69 +118,30 @@ app.get('/nosql-injection', async (req,res) => {
 });
 
 app.get('/members', (req,res) => {
-    var id = Math.floor(Math.random() * 3) + 1;
-    var username = req.session.user
     if (!req.session.authenticated) {
         console.log("user not logged in");
         res.redirect("/");
     }
-    switch (id) {
-        case 1:
-          res.send(`    
-          <h1>Hello, ${username}</h1>
-          <img src='/Blade.gif' style='width:500px';/>  
-          <form action='/logout' method='GET'>
-            <button>Sign Out</button>
-          </form>`);
-          break;
-        case 2:
-          res.send(`    
-          <h1>Hello, ${req.session.user}</h1>
-          <img src='/March7th.gif' style='width:500px';/>  
-          <form action='/logout' method='GET'>
-            <button>Sign Out</button>
-          </form>`);
-          break;
-        case 3:
-          res.send(`    
-          <h1>Hello, ${username}</h1>
-          <img src='/MC.gif' style='width:500px';/>  
-          <form action='/logout' method='GET'>
-            <button>Sign Out</button>
-          </form>`);
-          break;
-        }
+    res.render("members", {
+        username: req.session.user
+    });
+});
+
+app.get('/admin', sessionValidation, adminAuthorization, async (req,res) => {
+    
+    const result = await userCollection.find().project({username: 1, _id: 1}).toArray();
+
+    res.render("admin", {users: result});
 });
 
 app.get('/signup', (req,res) => {
-    var html = `
-    <h3>Create Account</h3>
-    <form action='/submitUser' method='post'>
-    <input name='username' type='text' placeholder='name'>
-    <br>
-    <input name='email' type='text' placeholder='email'>
-    <br>
-    <input name='password' type='password' placeholder='password'>
-    <br>
-    <button>Submit</button>
-    </form>
-    `;
-    res.send(html);
+    res.render("signup")
 });
 
 app.get('/login', (req,res) => {
-    var html = `
-    <h3>Log In</h3>
-    <form action='/loggingin' method='post'>
-    <input name='email' type='text' placeholder='email'>
-    <br>
-    <input name='password' type='password' placeholder='password'>
-    <br>
-    <button>Submit</button>
-    </form>
-    `;
-    res.send(html);
+    res.render("login")
 });
+
 
 app.post('/submitUser', async (req,res) => {
     var username = req.body.username;
@@ -178,20 +158,15 @@ app.post('/submitUser', async (req,res) => {
 	const validationResult = schema.validate({username, email, password});
 	if (validationResult.error != null) {
 	   console.log(validationResult.error);
-       var html = `
-        <form action='/signup' method='GET'>
-        <div>${validationResult.error.message}</div>
-        <br>
-        <button>Try Again</button>
-        </form>
-        `;
-        res.send(html);
-        return;
+       res.render("signupError", {
+        validation: validationResult.error.message
+       });
+       return;
    }
 
     var hashedPassword = await bcrypt.hash(password, saltRounds);
 
-	await userCollection.insertOne({username: username, email: email, password: hashedPassword});
+	await userCollection.insertOne({username: username, email: email, password: hashedPassword, user_type: "user"});
 	console.log("created user");
     const result = await userCollection.find({email: email}).project({username: 1, email: 1, password: 1, _id: 1}).toArray();
     req.session.authenticated = true;
@@ -199,7 +174,6 @@ app.post('/submitUser', async (req,res) => {
 	req.session.email = email;
 	req.session.cookie.maxAge = expireTime;
     res.redirect("/members");
-    res.send(html);
 });
 
 app.post('/loggingin', async (req,res) => {
@@ -210,36 +184,23 @@ app.post('/loggingin', async (req,res) => {
 	const validationResult = schema.validate(email);
 	if (validationResult.error != null) {
 	   console.log(validationResult.error);
-       var html = `
-       <form action='/login' method='GET'>
-       <div>Invalid username/passsword combination</div>
-       <br>
-       <button>Try Again</button>
-       </form>
-       `;
-       res.send(html);
+       res.render("loginError");
        return;
 	}
 
-    const result = await userCollection.find({email: email}).project({username: 1, email: 1, password: 1, _id: 1}).toArray();
+    const result = await userCollection.find({email: email}).project({username: 1, email: 1, password: 1, user_type: 1, _id: 1}).toArray();
     console.log(result);
 	if (result.length != 1) {
 		console.log("user not found");
-		var html = `
-       <form action='/login' method='GET'>
-       <div>Invalid username/passsword combination</div>
-       <br>
-       <button>Try Again</button>
-       </form>
-       `;
-       res.send(html);
-       return;
+		res.render("loginError");
+        return;
 	}
 	if (await bcrypt.compare(password, result[0].password)) {
 		console.log("correct password");
 		req.session.authenticated = true;
         req.session.user = result[0].username;
 		req.session.email = email;
+        req.session.user_type = result[0].user_type;
 		req.session.cookie.maxAge = expireTime;
 
 		res.redirect('/');
@@ -247,16 +208,15 @@ app.post('/loggingin', async (req,res) => {
 	}
 	else {
 		console.log("incorrect password");
-		var html = `
-       <form action='/login' method='GET'>
-       <div>Invalid username/passsword combination</div>
-       <br>
-       <button>Try Again</button>
-       </form>
-       `;
-       res.send(html);
-       return;
+		res.render("loginError");
+        return;
 	}
+});
+
+app.use('/loggedin', sessionValidation);
+
+app.get('/loggedin/info', (req,res) => {
+    res.render("loggedin-info");
 });
 
 app.get('/loggedin', (req,res) => {
@@ -264,7 +224,6 @@ app.get('/loggedin', (req,res) => {
         res.redirect('/login');
     }
     res.redirect('/members');
-    res.send(html);
 });
 
 app.get('/logout', (req,res) => {
@@ -277,7 +236,7 @@ app.use(express.static(__dirname + "/public"));
 
 app.get("*", (req,res) => {
     res.status(404);
-    res.send("Page not found - 404");
+    res.render("404")
 })
 
 app.listen(port, () => {
