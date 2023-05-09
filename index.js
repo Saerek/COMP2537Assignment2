@@ -128,10 +128,20 @@ app.get('/members', (req,res) => {
 });
 
 app.get('/admin', sessionValidation, adminAuthorization, async (req,res) => {
-    
-    const result = await userCollection.find().project({username: 1, _id: 1}).toArray();
-
+    const result = await userCollection.find().project({username: 1, email: 1, _id: 1}).toArray();
     res.render("admin", {users: result});
+});
+
+app.get('/adminButton', sessionValidation, adminAuthorization, async (req,res) => {
+    const result = await userCollection.find().project({username: 1, email: 1, _id: 1}).toArray();
+    await userCollection.updateOne({users: req.session.user}, {$set: {user_type: 'admin'}});
+    res.redirect("/admin");
+});
+
+app.get('/userButton', sessionValidation, adminAuthorization, async (req,res) => {
+    var username = req.session.user;
+    await userCollection.updateOne({users: req.session.user}, {$set: {user_type: 'user'}});
+    res.redirect("/admin");
 });
 
 app.get('/signup', (req,res) => {
