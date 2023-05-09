@@ -132,16 +132,21 @@ app.get('/admin', sessionValidation, adminAuthorization, async (req,res) => {
     res.render("admin", {users: result});
 });
 
-app.get('/adminButton', sessionValidation, adminAuthorization, async (req,res) => {
-    const result = await userCollection.find().project({username: 1, email: 1, _id: 1}).toArray();
-    await userCollection.updateOne({users: req.session.user}, {$set: {user_type: 'admin'}});
-    res.redirect("/admin");
+
+app.post('/adminButton', async (req,res) => {
+	var username = req.body.username;
+
+	await userCollection.updateOne({username: username}, {$set: {user_type: 'admin'}});
+    console.log("Changed user type to admin");
+	res.redirect('/admin');
 });
 
-app.get('/userButton', sessionValidation, adminAuthorization, async (req,res) => {
-    var username = req.session.user;
-    await userCollection.updateOne({users: req.session.user}, {$set: {user_type: 'user'}});
-    res.redirect("/admin");
+app.post('/userButton', async (req,res) => {
+    var username = req.body.username;
+
+	await userCollection.updateOne({username: username}, {$set: {user_type: 'user'}});
+    console.log("Changed user type to user");
+	res.redirect('/admin');
 });
 
 app.get('/signup', (req,res) => {

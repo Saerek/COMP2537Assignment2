@@ -1,4 +1,17 @@
-<li> <%= user.username %>: <%= user.email %> 
-    <form action="/adminButton"><button>Admin</button>
-    <form action="/userButton"><button>User</button></form> 
-</li>
+<div class="container text-center">
+
+    <div class="row">
+        <li> <%= user.username %>: <%= user.email %> 
+            <form action="/adminButton" method="post">
+                <input type="hidden" name="username" value="<%= user.username%>" />
+                &nbsp;
+                <button>Admin</button>
+            </form> 
+            <form action="/userButton" method="post">
+                <input type="hidden" name="username" value="<%= user.username%>" />
+                &nbsp;
+                <button>User</button>
+            </form> 
+        </li>
+    </div>
+</div>

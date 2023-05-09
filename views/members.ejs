@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <%- include("templates/header") %>  
+  <div class="container text-center">
+      <div class="row">
           <h1>Hello, <%= (username) %></h1>
-          <img src='/Blade.gif' style='width:500px';/>  
-          <img src='/March7th.gif' style='width:500px';/>  
-          <img src='/MC.gif' style='width:500px';/>  
+          <img src='/Blade.gif' style='width:425px';/>  
+          <img src='/March7th.gif' style='width:425px';/>  
+          <img src='/MC.gif' style='width:425px';/>
           <form action='/logout' method='GET'>
+            &nbsp;
             <button>Sign Out</button>
           </form>   
+      </div>
+  </div>
 <%- include("templates/footer") %> 
